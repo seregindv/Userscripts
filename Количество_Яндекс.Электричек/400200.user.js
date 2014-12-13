@@ -3,7 +3,7 @@
 // @namespace  http://rasp.yandex.ru/
 // @version    0.1
 // @description  показывает количество поездов
-// @include    /^(http:\/\/)?rasp\.yandex\.ru\/search.+$/
+// @include    /^(https?:\/\/)?(www\.)?rasp\.yandex\.ru\/search.+$/
 // ==/UserScript==
 
 function getTrainCount() {

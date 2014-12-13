@@ -3,7 +3,11 @@
 // @namespace   Ru.Mamba.Tweaks
 // @include     /^http://(www\.)?mamba\.ru/.*$/
 // @version     1
+// @grant		GM_openInTab
 // ==/UserScript==
+
+var hotkeyAddresses = [];
+var focusSet = false;
 
 if (document.location.href.indexOf("search.phtml") != -1) {
     //SwitchUps(true);
@@ -47,51 +51,61 @@ function ShowChildren() {
 }
 
 function NavigateThrough(event) {
+	if(!focusSet) {
+		//var loginBox = document.getElementById("inputLogin");
+		var loginBox = document.activeElement;
+		loginBox.blur();
+		focusSet = true;
+	}
     var eventCode = event.keyCode ? event.keyCode : event.which ? event.which : null;
-    var offsetNumber;
-    if (eventCode != 0x25 && eventCode != 0x27)
-        return;
-    var reg = /^(.+offset\=)(\d+)(.*)$/;
-    var hrefTokens = reg.exec(document.location.href);
-    if (hrefTokens.length < 4)
-        return;
-    offsetNumber = parseInt(hrefTokens[2]);
-    switch (eventCode) {
-        case 0x25:
-            offsetNumber -= 10;
-            break;
-        case 0x27:
-            offsetNumber += 10;
-            break;
-    }
-    document.location = hrefTokens[1] + offsetNumber + hrefTokens[3];
+	if (eventCode >= 96 && eventCode <= 105) {
+		var index = eventCode - 96;
+		if (hotkeyAddresses[index]) {
+			GM_openInTab(hotkeyAddresses[index]);
+		}
+	}
+    if (eventCode == 0x25 || eventCode == 0x27)
+	{
+		var offsetNumber;
+		var reg = /^(.+offset\=)(\d+)(.*)$/;
+		var hrefTokens = reg.exec(document.location.href);
+		if (hrefTokens.length < 4)
+			return;
+		offsetNumber = parseInt(hrefTokens[2]);
+		switch (eventCode) {
+			case 0x25:
+				offsetNumber -= 10;
+				break;
+			case 0x27:
+				offsetNumber += 10;
+				break;
+		}
+		document.location = hrefTokens[1] + offsetNumber + hrefTokens[3];
+	}
 }
 
 function ShowChildrenExt() {
 	var linkTags = document.getElementsByTagName("a");
-	var focusSet = false;
+	var index = 0;
     for (var i = 0; i < linkTags.length; i++) {
 		if(linkTags[i].getAttribute('class') == 'u-name') {
-			if(!focusSet) {
-				linkTags[i].focus();
-				focusSet = true;
-			}
+			index++;
 			//linkTags[i].innerHTML = linkTags[i].innerHTML + ' ' + linkTags[i].getAttribute('href');
-			send_with_ajax(linkTags[i].getAttribute('href'));
+			send_with_ajax(linkTags[i].getAttribute('href'), index);
 		}
 	}
 }
 
-function send_with_ajax( the_url ){
+function send_with_ajax( the_url, index ){
 	if(the_url.indexOf("http://") == -1)
 		return;
     var httpRequest = new XMLHttpRequest();
-    httpRequest.onreadystatechange = function() { alertContents(httpRequest, the_url); };  
+    httpRequest.onreadystatechange = function() { alertContents(httpRequest, the_url, index); };  
     httpRequest.open("GET", the_url, true);
     httpRequest.send(null);
 }
 
-function alertContents(httpRequest, the_url){
+function alertContents(httpRequest, the_url, index){
     if (httpRequest.readyState == 4){
         // everything is good, the response is received
         if ((httpRequest.status == 200) || (httpRequest.status == 0)){
@@ -101,11 +115,21 @@ function alertContents(httpRequest, the_url){
                 children = tokens[1].toLowerCase();
             }
 			var photoLinkTokens = /a href="(http:\/\/www\.mamba\.ru\/\w{2}\/mb\d+\/album_photos[^"]+)/.exec(httpRequest.responseText);
+			var photolinksFound = photoLinkTokens && photoLinkTokens.length >= 2;
 			var noAlcohol = httpRequest.responseText.indexOf("Не пью вообще") != -1;
 			var linkTags = document.getElementsByTagName("a");
 			for (var i = 0; i < linkTags.length; i++) {
 				if(linkTags[i].getAttribute('class') == 'u-name' && linkTags[i].getAttribute('href') == the_url) {
-					linkTags[i].parentNode.innerHTML = linkTags[i].parentNode.innerHTML + ' ' + children;
+					var indexHtml;
+					if(index > 10) {
+						indexHtml = "";
+					} else {
+						if(index == 10)
+							index = 0;
+						indexHtml = "<font color=\"green\" size=\"6\"><b>" + index + "</b></font> ";
+						hotkeyAddresses[index] = photolinksFound ? photoLinkTokens[1] : the_url;
+					}
+					linkTags[i].parentNode.innerHTML = indexHtml + linkTags[i].parentNode.innerHTML + ' ' + children;
 					var divPicNode = linkTags[i].parentNode.parentNode.previousSibling.previousSibling;
 					if(children.indexOf("есть") != -1 || noAlcohol) {
 						// DIV u-m-photo u-photo
@@ -113,7 +137,7 @@ function alertContents(httpRequest, the_url){
 						divPicNode.setAttribute("onMouseOver", "this.style.opacity = 1");
 						divPicNode.setAttribute("onMouseOut", "this.style.opacity = .1");
 					}
-					if(photoLinkTokens && photoLinkTokens.length >= 2) {
+					if(photolinksFound) {
 						var picRefPhotoNodes = divPicNode.getElementsByTagName("a");
 						//console.log("picRefPhotoNodes " + picRefPhotoNodes[0].href);
 						//console.log(" -> " + photoLinkTokens[1]);
