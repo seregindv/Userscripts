@@ -12,8 +12,7 @@ var focusSet = false;
 if (document.location.href.indexOf("search.phtml") != -1) {
     //SwitchUps(true);
     document.onkeydown = NavigateThrough;
-}
-if (/.+\/mb\d+\/.*/.test(document.location.href)) {
+} else {
     document.onkeydown = ProfileNavigate;
 }
 //else if (document.location.href.indexOf("anketa.phtml?oid=") != -1)
@@ -111,10 +110,10 @@ function NavigateThrough(event) {
         offsetNumber = parseInt(hrefTokens[2]);
         switch (eventCode) {
             case 0x25:
-                offsetNumber -= 10;
+                offsetNumber -= 24;
                 break;
             case 0x27:
-                offsetNumber += 10;
+                offsetNumber += 24;
                 break;
         }
         document.location = hrefTokens[1] + offsetNumber + hrefTokens[3];
@@ -124,39 +123,69 @@ function NavigateThrough(event) {
 function ShowChildrenExt() {
     var linkTags = document.getElementsByTagName("a");
     var index = 0;
+	var idRegEx = /\/(\d{10,})\//;
     for (var i = 0; i < linkTags.length; i++) {
-        if (linkTags[i].getAttribute('class') == 'u-name') {
-            index++;
-            //linkTags[i].innerHTML = linkTags[i].innerHTML + ' ' + linkTags[i].getAttribute('href');
-            send_with_ajax(linkTags[i].getAttribute('href'), index);
+        if (linkTags[i].getAttribute('class') == 'img-responsive') {
+			var imgElement = linkTags[i].getElementsByTagName('img')[0];
+			var imgSrc = imgElement.getAttribute('src');
+			var idTokens = idRegEx.exec(imgSrc);
+			if(idTokens && idTokens.length >=2) {
+				var ref = 'http://www.mamba.ru/ru/mb' + idTokens[1];
+				//console.log('imgSrc', imgSrc);
+				//console.log('ref', ref);
+				send_with_ajax(imgSrc, ref, index);
+				index++;
+			}
         }
     }
 }
 
-function send_with_ajax(the_url, index) {
-    if (the_url.indexOf("http://") == -1)
+function send_with_ajax(imgUrl, requestUrl, index) {
+    if (requestUrl.indexOf("http://") == -1)
         return;
     var httpRequest = new XMLHttpRequest();
-    httpRequest.onreadystatechange = function () { alertContents(httpRequest, the_url, index); };
-    httpRequest.open("GET", the_url, true);
+    httpRequest.onreadystatechange = function () { alertContents(httpRequest, imgUrl, requestUrl, index); };
+    httpRequest.open("GET", requestUrl, true);
     httpRequest.send(null);
 }
 
-function alertContents(httpRequest, the_url, index) {
+function alertContents(httpRequest, imgUrl, requestUrl, index) {
     if (httpRequest.readyState == 4) {
         // everything is good, the response is received
         if ((httpRequest.status == 200) || (httpRequest.status == 0)) {
+			//console.log('imgUrl', imgUrl)
+			//console.log('requestUrl', requestUrl)
             var tokens = /есть ли дети:\s*([^;"]+)/.exec(httpRequest.responseText);
             var children = "есть";
             if (tokens && tokens.length >= 2) {
                 children = tokens[1].toLowerCase();
             }
-            var photoLinkTokens = /a href="(http:\/\/www\.mamba\.ru\/\w{2}\/mb\d+\/album_photos[^"]+)/.exec(httpRequest.responseText);
+			//console.log('children', children);
+            var photoLinkTokens = /a href="(http:\/\/www\.mamba\.ru\/\w{2}\/.+?\/album_photos[^"]+)/.exec(httpRequest.responseText);
             var photolinksFound = photoLinkTokens && photoLinkTokens.length >= 2;
             var noAlcohol = httpRequest.responseText.indexOf("Не пью вообще") != -1;
-            var linkTags = document.getElementsByTagName("a");
-            for (var i = 0; i < linkTags.length; i++) {
-                if (linkTags[i].getAttribute('class') == 'u-name' && linkTags[i].getAttribute('href') == the_url) {
+            var heightTokens = />(\d+)\s*см</.exec(httpRequest.responseText);
+            var height = "";
+            if (heightTokens && heightTokens.length >= 2) {
+                height = heightTokens[1];
+            }
+            var weightTokens = />(\d+)\s*кг</.exec(httpRequest.responseText);
+            var weight = "";
+            if (weightTokens && weightTokens.length >= 2) {
+                weight = weightTokens[1];
+            }
+            var heightWeight = "";
+            if (height != "" || weight != "") {
+                heightWeight = " " + height;
+                if (weight != "") {
+                    heightWeight = heightWeight + "/" + weight;
+                }
+            }
+            //console.log('height', height)
+			//console.log('weight', weight);
+            var imgTags = document.getElementsByTagName("img");
+            for (var i = 0; i < imgTags.length; i++) {
+                if (imgTags[i].getAttribute('class') == 'hide' && imgTags[i].getAttribute('src') == imgUrl) {
                     var indexHtml;
                     if (index > 10) {
                         indexHtml = "";
@@ -164,28 +193,63 @@ function alertContents(httpRequest, the_url, index) {
                         if (index == 10)
                             index = 0;
                         indexHtml = "<font color=\"green\" size=\"6\"><b>" + index + "</b></font> ";
-                        hotkeyAddresses[index] = photolinksFound ? photoLinkTokens[1] : the_url;
+                        hotkeyAddresses[index] = photolinksFound ? photoLinkTokens[1] : requestUrl;
                     }
-                    var profileInfo = linkTags[i].parentNode.textContent;
-                    linkTags[i].parentNode.innerHTML = indexHtml + linkTags[i].parentNode.innerHTML + ' ' + children;
-                    var divPicNode = linkTags[i].parentNode.parentNode.previousSibling.previousSibling;
+                    //imgTags[i].parentNode.innerHTML = indexHtml + imgTags[i].parentNode.innerHTML + ' ' + children;
+                    var divPicNode = imgTags[i].parentNode.parentNode;
                     if (children.indexOf("есть") != -1 || noAlcohol) {
                         // DIV u-m-photo u-photo
                         divPicNode.style = "opacity: 0.1;";
                         divPicNode.setAttribute("onMouseOver", "this.style.opacity = 1");
                         divPicNode.setAttribute("onMouseOut", "this.style.opacity = .1");
                     } else {
-                        var imgs = divPicNode.getElementsByTagName("img");
+                        /*var imgs = divPicNode.getElementsByTagName("img");
                         if (imgs.length > 0) {
-                            var address = linkTags[i].parentNode.parentNode.getElementsByTagName("address")[0].textContent;
+                            var saInfoElement = imgTags[i].parentNode.parentNode;
+                            var nameElements = document.evaluate(".//a[@class='u-name']", saInfoElement, null, XPathResult.ANY_TYPE, null);
+                            var nameElement = nameElements.iterateNext();
+                            var name = nameElement.textContent;
+                            var link = nameElement.getAttribute("href");
+                            var ageElements = document.evaluate("./following-sibling::b", nameElement, null, XPathResult.ANY_TYPE, null);
+                            var ageElement = ageElements.iterateNext();
+                            var age = "";
+                            if (ageElement != null)
+                                age = ageElement.textContent;
+                            var address = saInfoElement.getElementsByTagName("address")[0].textContent;
+                            var addressTokens = /Россия, (.+)/.exec(address);
+                            if (addressTokens && addressTokens.length >= 2) {
+                                address = addressTokens[1];
+                            }
+                            addressTokens = /Москва, (м\.\s*.+)/.exec(address);
+                            if (addressTokens && addressTokens.length >= 2) {
+                                address = addressTokens[1];
+                            }
+                            var lookingForElements = saInfoElement.getElementsByClassName("s-param");
+                            var lookingFor = "";
+                            if (lookingForElements.length > 0) {
+                                lookingFor = lookingForElements[0].textContent;
+                                // not sure why it's not working
+                                //lookingFor.replace("Ищу ", "");
+                                if (lookingFor.substring(0, 4) == "Ищу ") {
+                                    lookingFor = lookingFor.substring(4, lookingFor.length);
+                                }
+                            }
+                            // <li class="U-Normal UT-Normal ">
+                            var profileRoot = saInfoElement.parentNode.parentNode;
+                            var photoCountElements = profileRoot.getElementsByClassName("vp-count");
+                            var photoCount = "";
+                            if (photoCountElements.length > 0) {
+                                photoCount = photoCountElements[0].textContent;
+                            }
+                            // 
                             var ribbon = GetRibbon();
                             var ribbonItem = document.createElement("table");
                             ribbonItem.style = 'display: inline-block; width: auto; margin-right: 3px';
-                            ribbonItem.innerHTML = "<tr><td>" + imgs[0].outerHTML + "</td></tr><tr><td><font color=\"green\" size=\"3\"><b>" + index + "</b></font> " + profileInfo + "<br>" + address + "</td></tr>";
-                            //ribbonItem.width = 'auto';
+                            //console.log("<tr><td>" + "<a href='" + link + "'>" + imgs[0].outerHTML + "</a></td></tr><tr><td><font color=\"green\" size=\"3\"><b>" + index + "</b></font> " + "<a href='" + link + "'>" + name + "</a>" + ", <b>" + age + "</b><br>" + address + "<br>" + lookingFor + "<div style='color: #F60'>" + photoCount + "</div>" + "</td></tr>");
+                            ribbonItem.innerHTML = "<tr><td>" + imgs[0].outerHTML + "</td></tr><tr><td><font color=\"green\" size=\"3\"><b>" + index
+                                + "</b></font> <span style=\"color: #06C\">" + name + "</span>, <b>" + age + "</b><br>" + address + "<br>" + lookingFor + "<table><tr><td style='color: #F60'>" + photoCount + "</td><td style=\"padding-right: 5px\" align=\"right\">" + heightWeight + "</td></tr></table></td></tr>";
                             ribbon.appendChild(ribbonItem);
-                            //ribbon.innerHTML += "<table style='display: inline-block'><tr><td>" + imgs[0].outerHTML + "</td></tr><tr><td><font color=\"green\" size=\"3\">" + index + "</font></td></tr></table>";
-                        }
+                        }*/
                     }
                     if (photolinksFound) {
                         var picRefPhotoNodes = divPicNode.getElementsByTagName("a");
