@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name        Forum Unreads
 // @namespace   Forum.Unreads
-// @include     /^https?://(www\.)?ca.ca.s\.net/discover/unread/.*$/
+// @include     /^https?://(www\.)?ca.ca.s\.net/discover/.*$/
 // @version     1
 // @grant       none
 // ==/UserScript==
-// /^https?://(www\.)?ca.ca.s\.net/forums/.*$/
+// /^https?://(www\.)?ca.ca.s\.net/(forums|discover)/.*$/
 
 var failCount = 0;
 var stopRequested = false;
+var imageSet;
 
 function GetElementByAttribute(doc, tagName, attributeName, attributeValue)
 {
@@ -118,6 +119,7 @@ function getP()
 
 function ShowLinkSummary()
 {
+  imageSet = new Set();
   var linkCounts = GetLinkCounts();
   var span = getP();
   if(span != null)
@@ -144,10 +146,14 @@ function ShowLinkSummary()
          linkCount.name.indexOf("Wrestling") == -1 &&
          linkCount.name.indexOf("List of Managers") == -1 &&
          linkCount.name != "The big buffering FAQ" &&
+         linkCount.name != "Sam & Fin" &&
          linkCount.name.indexOf("Hot amature") == -1 &&
          linkCount.name.indexOf("Android") == -1 &&
-         linkCount.name.indexOf("des filles" == -1))
-       linkCountArray.push(linkCount);
+         linkCount.name.indexOf("des filles" == -1) &&
+         linkCount.name.indexOf("Celebrities" == -1) &&
+         linkCount.name.indexOf("Webcam" == -1) &&
+         linkCount.name.indexOf("Exhibitionism" == -1))
+       	linkCountArray.push(linkCount);
     }
     linkCountArray.sort(compareLinksByCountDescending)
     for(var i = 0; i < linkCountArray.length; i++)
@@ -158,7 +164,9 @@ function ShowLinkSummary()
         ' - <a href="' + linkCount.link +
         '">' + linkCount.name + '</a>';
       span.appendChild(div)
-      linkClick(div, linkCount);
+      if (linkCount.name.indexOf('Video') == -1) {
+				linkClick(div, linkCount);
+      }
     }
   }
 }
@@ -196,7 +204,6 @@ function onRequestStateChanged(request, tag, linkCount)
 function addImages(tag, doc, linkCount)
 {
   var images = doc.getElementsByTagName('img');
-  var imageSet = new Set();
  	for(var i = 0; i < images.length; i++)
   {
     var image = images[i];
@@ -225,7 +232,7 @@ function addImages(tag, doc, linkCount)
 
 function AddStop()
 {
-  var span = GetElementByAttribute(document, 'div', 'class', 'ipsResponsive_hidePhone');
+  var span = GetElementByAttribute(document, 'div', 'id', 'ipsLayout_header');
 
   var stop = document.createElement("BUTTON");
   stop.onclick = function() { stopRequested = true; }
@@ -248,5 +255,3 @@ function AddStop()
 
 AddStop();
 RunShowMore();
-//linkClick(GetElementByAttribute(document, 'h1', 'class', 'ipsType_pageTitle'),
-//  { name: "", link: 'https://camcaps.net/forums/topic/10666-anna-alex-bree-drew-lexy-pete/?page=34', count: 50, processed: 0 });
