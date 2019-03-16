@@ -207,7 +207,7 @@ function addImages(tag, doc, linkCount)
  	for(var i = 0; i < images.length; i++)
   {
     var image = images[i];
-    var imageSource = image.src;
+    var imageSource = image.getAttribute('data-src');
     if(imageSet.has(imageSource))
       continue;
     imageSet.add(imageSource);
