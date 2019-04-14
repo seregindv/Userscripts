@@ -5,7 +5,7 @@
 // @version     1
 // @grant       none
 // ==/UserScript==
-// /^https?://(www\.)?ca.ca.s\.net/(forums|discover)/.*$/
+// /^https?\:\/\/(www\.)?ca.ca.s\.net\/(forums|discover)/.*$/
 
 var failCount = 0;
 var stopRequested = false;
@@ -43,7 +43,7 @@ function GetElementCountByAttribute(doc, tagName, attributeName, attributeValue)
   {
     var element = elements[i];
     if(element.getAttribute(attributeName) == attributeValue)
-       result++;
+      result++;
   }
   return result;
 }
@@ -52,7 +52,7 @@ function RunShowMore()
 {
   if(stopRequested)
     return;
-  
+
   var showMore = GetElementByAttribute(document, 'a', 'data-action', 'loadMore');
 
   if(showMore == null)
@@ -113,6 +113,15 @@ function getP()
   return GetElementByAttribute(document, 'span', 'data-role', 'streamTitle');
 }
 
+function showHide(e)
+{
+  e.preventDefault();
+  var div = e.currentTarget.parentNode.getElementsByTagName('div')[0];
+  if(!div)
+    return;
+  div.hidden = !div.hidden;
+}
+
 function ShowLinkSummary()
 {
   imageSet = new Set();
@@ -152,27 +161,57 @@ function ShowLinkSummary()
          linkCount.name.indexOf("Nudism") == -1 &&
          linkCount.name.indexOf("★★★") == -1 &&
          linkCount.name.indexOf("Webcam") == -1)
-       	linkCountArray.push(linkCount);
+        linkCountArray.push(linkCount);
     }
     linkCountArray.sort(compareLinksByCountDescending)
-    
+
     var mainDiv = span.getElementsByTagName('div')[0];
     if(mainDiv){
       span.removeChild(mainDiv);
     }
     mainDiv = document.createElement('div');
     span.appendChild(mainDiv);
-    
+
     for(var i = 0; i < linkCountArray.length; i++)
     {
       var linkCount = linkCountArray[i];
+      var noVideo = linkCount.name.indexOf('Video') == -1;
       var div = document.createElement('div');
-      div.innerHTML = linkCount.count + 
-        ' - <a href="' + linkCount.link +
-        '" target="_blank">' + linkCount.name + '</a>';
-      mainDiv.appendChild(div)
-      if (linkCount.name.indexOf('Video') == -1) {
-				linkClick(div, linkCount);
+      div.appendChild(document.createTextNode(linkCount.count + ' - '));
+
+      var linkNode = document.createElement('a');
+      if(noVideo)
+      {
+        linkNode.href = '#';
+        linkNode.addEventListener("click", showHide, false);
+      }
+      else
+      {
+        linkNode.href = linkCount.link;
+        linkNode.target = '_blank';
+      }
+      linkNode.innerHTML = linkCount.name;
+      div.appendChild(linkNode);
+
+
+      if(noVideo) 
+      {
+        div.appendChild(document.createTextNode(' '));
+
+        linkNode = document.createElement('a');
+        linkNode.href = linkCount.link;
+        linkNode.innerHTML = '&gt;&gt;';
+        linkNode.style = 'color: blue;';
+        linkNode.target = '_blank';
+        div.appendChild(linkNode);
+      }
+
+      var linksDiv = document.createElement('div');
+      div.appendChild(linksDiv);
+
+      mainDiv.appendChild(div);
+      if (noVideo) {
+        linkClick(linksDiv, linkCount);
       }
     }
   }
@@ -192,7 +231,7 @@ function onRequestStateChanged(request, tag, linkCount)
     return;
   if(request.status != 200 && request.status != 0)
     return;
-  
+
   var parser = new DOMParser();
   var doc = parser.parseFromString(request.responseText, "text/html");
   var postCount = GetElementCountByAttribute(doc, 'div','data-role', 'commentContent');
@@ -211,7 +250,7 @@ function onRequestStateChanged(request, tag, linkCount)
 function addImages(tag, doc, linkCount)
 {
   var images = doc.getElementsByTagName('img');
- 	for(var i = 0; i < images.length; i++)
+  for(var i = 0; i < images.length; i++)
   {
     var image = images[i];
     var imageSource = image.getAttribute('data-src');
@@ -220,17 +259,17 @@ function addImages(tag, doc, linkCount)
     imageSet.add(imageSource);
     if(image.className.indexOf("ipsImage") == -1)
       continue;
-    
+
     var div = document.createElement("div");
     div.style.cssText = "margin-bottom: 5px;";
-    
+
     var a = document.createElement("a");
     a.href = linkCount.link;
     a.target = '_blank';
-    
+
     var img = document.createElement("img");
     img.src = imageSource;
-    
+
     a.appendChild(img);
     div.appendChild(a);
     tag.appendChild(div);
@@ -246,7 +285,7 @@ function AddStop()
   var t = document.createTextNode("Stop");
   stop.appendChild(t);
   span.appendChild(stop);
-  
+
   var showMore = document.createElement("BUTTON");
   showMore.onclick = function() { stopRequested = false; RunShowMore(); }
   t = document.createTextNode("Continue");
