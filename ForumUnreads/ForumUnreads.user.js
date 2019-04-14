@@ -48,10 +48,6 @@ function GetElementCountByAttribute(doc, tagName, attributeName, attributeValue)
   return result;
 }
 
-function GetCurrentPage()
-{
-}
-
 function RunShowMore()
 {
   if(stopRequested)
@@ -132,7 +128,7 @@ function ShowLinkSummary()
          linkCount.name.indexOf("CC Mods") == -1 &&
          linkCount.name.indexOf("Chat") == -1 &&
          linkCount.name != "Freddy" &&
-         linkCount.name.indexOf("Home Amateur") == -1 &&
+         linkCount.name.indexOf("Amateur") == -1 &&
          linkCount.name.indexOf("4shared leaked") == -1 &&
          linkCount.name.indexOf("Sexy And Pretty") == -1 &&
          linkCount.name.indexOf("Girls in Solo") == -1 &&
@@ -149,21 +145,32 @@ function ShowLinkSummary()
          linkCount.name != "Sam & Fin" &&
          linkCount.name.indexOf("Hot amature") == -1 &&
          linkCount.name.indexOf("Android") == -1 &&
-         linkCount.name.indexOf("des filles" == -1) &&
-         linkCount.name.indexOf("Celebrities" == -1) &&
-         linkCount.name.indexOf("Webcam" == -1) &&
-         linkCount.name.indexOf("Exhibitionism" == -1))
+         linkCount.name.indexOf("anus des") == -1 &&
+         linkCount.name.indexOf("Celeb") == -1 &&
+         linkCount.name.indexOf("Webcam") == -1 &&
+         linkCount.name.indexOf("Exhibitionism") == -1 &&
+         linkCount.name.indexOf("Nudism") == -1 &&
+         linkCount.name.indexOf("★★★") == -1 &&
+         linkCount.name.indexOf("Webcam") == -1)
        	linkCountArray.push(linkCount);
     }
     linkCountArray.sort(compareLinksByCountDescending)
+    
+    var mainDiv = span.getElementsByTagName('div')[0];
+    if(mainDiv){
+      span.removeChild(mainDiv);
+    }
+    mainDiv = document.createElement('div');
+    span.appendChild(mainDiv);
+    
     for(var i = 0; i < linkCountArray.length; i++)
     {
       var linkCount = linkCountArray[i];
       var div = document.createElement('div');
       div.innerHTML = linkCount.count + 
         ' - <a href="' + linkCount.link +
-        '">' + linkCount.name + '</a>';
-      span.appendChild(div)
+        '" target="_blank">' + linkCount.name + '</a>';
+      mainDiv.appendChild(div)
       if (linkCount.name.indexOf('Video') == -1) {
 				linkClick(div, linkCount);
       }
