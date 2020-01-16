@@ -1,285 +1,97 @@
 // ==UserScript==
-// @name        Mamba tweaks
-// @namespace   Ru.Mamba.Tweaks
-// @include     /^http://(www\.)?mamba\.ru/.*$/
-// @version     1
-// @grant		GM_openInTab
+// @name         Mamba separate site
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  site over site
+// @author       Me
+// @match        https://love.mail.ru/search/*
+// @grant        none
 // ==/UserScript==
 
-var hotkeyAddresses = [];
-var focusSet = false;
-
-if (document.location.href.indexOf("search.phtml") != -1) {
-    //SwitchUps(true);
-    document.onkeydown = NavigateThrough;
-} else {
-    document.onkeydown = ProfileNavigate;
-}
-//else if (document.location.href.indexOf("anketa.phtml?oid=") != -1)
-ShowChildren();
-ShowChildrenExt();
-
-function SwitchUps(hideUps) {
-    var ups = document.getElementsByTagName("A");
-    for (var i = 0; i < ups.length; i++) {
-        if (ups[i].href && ups[i].className.indexOf("MakeUpBuyIconClass") != -1) {
-            var parent = ups[i].parentNode.parentNode.parentNode.parentNode.parentNode;
-            if (parent && parent.tagName == "LI") {
-                parent.style.display = hideUps ? "none" : "";
-            }
-        }
-    }
+function addJQuery(callback) {
+  var script = document.createElement("script");
+  script.setAttribute("src", "//code.jquery.com/jquery-3.4.1.min.js");
+  script.addEventListener('load', function() {
+    var script = document.createElement("script");
+    script.textContent = "window.$=jQuery.noConflict(true);(" + callback.toString() + ")();";
+    document.body.appendChild(script);
+  }, false);
+  document.body.appendChild(script);
 }
 
-function ShowChildren() {
-    var ups = document.getElementsByTagName("meta");
-    var children = "есть";
-    for (var i = 0; i < ups.length; i++) {
-        if (ups[i].getAttribute('name') == 'keywords') {
-            var tokens = /есть ли дети:\s*([^;]+)/.exec(ups[i].getAttribute('content'));
-            if (tokens && tokens.length >= 2) {
-                children = tokens[1].toLowerCase();
-                break;
-            }
-        }
+function onLoad()
+{
+  function showData(data) {
+    const results = $("#results");
+    results.empty();
+    for (let item of data.items) {
+      const ageRange = /(\d+)\D+?(\d+)/.exec(item.lookForAge);
+      if (ageRange != null && parseInt(ageRange[2]) < 41)
+        continue;
+      results.append(
+  `<div style="display: inline-block; max-width: 150px; border: 1px solid lightgray; margin: 5px; border-radius: 10px; overflow: hidden">
+      <a href="https://love.mail.ru/${item.login}" target="_blank" rel="noopener noreferrer">
+          <img src="${item.photo}" />
+          <div style="margin: 5px;">
+              <div>${item.name}, ${item.selfAge}</div>
+              <div>${item.location}</div>
+              <div>${item.photoCounters.total} фото, ${item.lookForAge}</div>
+          </div>
+      </a>
+  </div>`);
+      $("#pageCount").html(Math.ceil(data.paging.total / 56.0));
     }
-    var nameTags = document.getElementsByTagName("h1");
-    for (var i = 0; i < nameTags.length; i++) {
-        if (nameTags[i].className.indexOf("infoName dib") != -1) {
-            nameTags[i].innerHTML = nameTags[i].innerHTML + " (" + children + ")";
-            break;
-        }
+  }
+
+  function loadSearchPage(offset){
+    var url = `/api/search?offset=${(offset || 0) * 56}&noid=0&nchanged=0&nactive=0&limit=56&statusNames=geoDistance%2ChasVerifiedPhoto`;
+    $.get(url)
+    	.done(data => {
+      showData(data);
+    }).fail(e => {
+    });
+  }
+  
+  function navigate(page) {
+    let current = parseInt($("#nav-page").val());
+    switch(page){
+      case 'back':
+        current--;
+        $("#nav-page").val(current);
+        break;
+      case 'forward':
+        current++;
+        $("#nav-page").val(current);
+        break;
     }
+    loadSearchPage(current);
+  }
+
+  $(document).ready(d =>{
+        $('body').css('overflow', 'hidden')
+            .append(
+`<div id="mainOverdiv"
+  style='width: calc(100% - 40px); height: calc(100% - 40px); left: 0; top: 0; position: fixed; margin: 20px;
+    background-color: white; z-index: 10000; border: 1px solid gray; box-shadow: 0 0 1em gray; border-radius: 10px; display: flex; flex-direction: column'>
+<div style="text-align: right; margin-right: 3px; margin-top: 2px">
+  <svg width="13" height="13" id="closeButton"
+    onmouseover="this.querySelector('circle').removeAttribute('display');"
+    onmouseout="this.querySelector('circle').setAttribute('display', 'none');"
+    onclick="const element = document.getElementById('mainOverdiv'); element.parentNode.removeChild(element); document.getElementsByTagName('body')[0].style.overflow = 'auto';"
+    style="cursor: pointer">
+    <circle cx="6" cy="6" r="6" fill="#e0e0e0" display="none" />
+    <line x1="3" y1="3" x2="9" y2="9" style="stroke: black; stroke-width: 1" />
+    <line x1="3" y1="9" x2="9" y2="3" style="stroke: black; stroke-width: 1" />
+  </svg>
+</div>
+<div id="results" style='background-color: #f0f0f0; overflow: auto; flex-grow: 1'></div>
+<div style="text-align: right; margin-right: 3px; margin-bottom: 2px"><a href="#" id="nav-back">&lt;&lt;</a><input id="nav-page" type="number" min="1" max="272" value="1" style="width: 3em" /> of<span style="margin: 0 5px" id="pageCount" /><a href="#" id="nav-forward">&gt;&gt;</a></div>
+</div>`);
+      $("#nav-back").click(() => navigate('back'));
+      $("#nav-forward").click(() => navigate('forward'));
+      $("#nav-page").keyup(e => {if(e.key == "Enter") navigate();});
+      loadSearchPage();
+    });
 }
 
-function BlurFocus() {
-    if (!focusSet) {
-        //var loginBox = document.getElementById("inputLogin");
-        var loginBox = document.activeElement;
-        loginBox.blur();
-        focusSet = true;
-    }
-}
-
-function ProfileNavigate(event) {
-    BlurFocus();
-    var eventCode = event.keyCode ? event.keyCode : event.which ? event.which : null;
-    /*
-	// del (not working)
-	if(eventCode == 46)
-	{
-		window.close();
-	}*/
-    // /
-    if (eventCode == 106) {
-        var refs = document.getElementsByTagName("a");
-        for (var ref in refs) {
-            if (refs[ref].className.indexOf("big ot-photo") != -1) {
-                refs[ref].click();
-                break;
-            }
-        }
-    }
-    // *
-    if (eventCode == 111) {
-        var profileRefs = document.getElementsByTagName("a");
-        for (var profileRef in profileRefs) {
-            if (profileRefs[profileRef].className == "sel-anketa-nav-anketa") {
-                profileRefs[profileRef].click();
-                break;
-            }
-        }
-    }
-}
-
-function NavigateThrough(event) {
-    BlurFocus();
-    var eventCode = event.keyCode ? event.keyCode : event.which ? event.which : null;
-    if (eventCode >= 96 && eventCode <= 105) {
-        var index = eventCode - 96;
-        if (hotkeyAddresses[index]) {
-            GM_openInTab(hotkeyAddresses[index]);
-        }
-    }
-    if (eventCode == 0x25 || eventCode == 0x27) {
-        var offsetNumber;
-        var reg = /^(.+offset\=)(\d+)(.*)$/;
-        var hrefTokens = reg.exec(document.location.href);
-        if (hrefTokens.length < 4)
-            return;
-        offsetNumber = parseInt(hrefTokens[2]);
-        switch (eventCode) {
-            case 0x25:
-                offsetNumber -= 24;
-                break;
-            case 0x27:
-                offsetNumber += 24;
-                break;
-        }
-        document.location = hrefTokens[1] + offsetNumber + hrefTokens[3];
-    }
-}
-
-function ShowChildrenExt() {
-    var linkTags = document.getElementsByTagName("a");
-    var index = 0;
-	var idRegEx = /\/(\d{10,})\//;
-    for (var i = 0; i < linkTags.length; i++) {
-        if (linkTags[i].getAttribute('class') == 'img-responsive') {
-			var imgElement = linkTags[i].getElementsByTagName('img')[0];
-			var imgSrc = imgElement.getAttribute('src');
-			var idTokens = idRegEx.exec(imgSrc);
-			if(idTokens && idTokens.length >=2) {
-				var ref = 'http://www.mamba.ru/ru/mb' + idTokens[1];
-				//console.log('imgSrc', imgSrc);
-				//console.log('ref', ref);
-				send_with_ajax(imgSrc, ref, index);
-				index++;
-			}
-        }
-    }
-}
-
-function send_with_ajax(imgUrl, requestUrl, index) {
-    if (requestUrl.indexOf("http://") == -1)
-        return;
-    var httpRequest = new XMLHttpRequest();
-    httpRequest.onreadystatechange = function () { alertContents(httpRequest, imgUrl, requestUrl, index); };
-    httpRequest.open("GET", requestUrl, true);
-    httpRequest.send(null);
-}
-
-function alertContents(httpRequest, imgUrl, requestUrl, index) {
-    if (httpRequest.readyState == 4) {
-        // everything is good, the response is received
-        if ((httpRequest.status == 200) || (httpRequest.status == 0)) {
-			//console.log('imgUrl', imgUrl)
-			//console.log('requestUrl', requestUrl)
-            var tokens = /есть ли дети:\s*([^;"]+)/.exec(httpRequest.responseText);
-            var children = "есть";
-            if (tokens && tokens.length >= 2) {
-                children = tokens[1].toLowerCase();
-            }
-			//console.log('children', children);
-            var photoLinkTokens = /a href="(http:\/\/www\.mamba\.ru\/\w{2}\/.+?\/album_photos[^"]+)/.exec(httpRequest.responseText);
-            var photolinksFound = photoLinkTokens && photoLinkTokens.length >= 2;
-            var noAlcohol = httpRequest.responseText.indexOf("Не пью вообще") != -1;
-            var heightTokens = />(\d+)\s*см</.exec(httpRequest.responseText);
-            var height = "";
-            if (heightTokens && heightTokens.length >= 2) {
-                height = heightTokens[1];
-            }
-            var weightTokens = />(\d+)\s*кг</.exec(httpRequest.responseText);
-            var weight = "";
-            if (weightTokens && weightTokens.length >= 2) {
-                weight = weightTokens[1];
-            }
-            var heightWeight = "";
-            if (height != "" || weight != "") {
-                heightWeight = " " + height;
-                if (weight != "") {
-                    heightWeight = heightWeight + "/" + weight;
-                }
-            }
-            //console.log('height', height)
-			//console.log('weight', weight);
-            var imgTags = document.getElementsByTagName("img");
-            for (var i = 0; i < imgTags.length; i++) {
-                if (imgTags[i].getAttribute('class') == 'hide' && imgTags[i].getAttribute('src') == imgUrl) {
-                    var indexHtml;
-                    if (index > 10) {
-                        indexHtml = "";
-                    } else {
-                        if (index == 10)
-                            index = 0;
-                        indexHtml = "<font color=\"green\" size=\"6\"><b>" + index + "</b></font> ";
-                        hotkeyAddresses[index] = photolinksFound ? photoLinkTokens[1] : requestUrl;
-                    }
-                    //imgTags[i].parentNode.innerHTML = indexHtml + imgTags[i].parentNode.innerHTML + ' ' + children;
-                    var divPicNode = imgTags[i].parentNode.parentNode;
-                    if (children.indexOf("есть") != -1 || noAlcohol) {
-                        // DIV u-m-photo u-photo
-                        divPicNode.style = "opacity: 0.1;";
-                        divPicNode.setAttribute("onMouseOver", "this.style.opacity = 1");
-                        divPicNode.setAttribute("onMouseOut", "this.style.opacity = .1");
-                    } else {
-                        /*var imgs = divPicNode.getElementsByTagName("img");
-                        if (imgs.length > 0) {
-                            var saInfoElement = imgTags[i].parentNode.parentNode;
-                            var nameElements = document.evaluate(".//a[@class='u-name']", saInfoElement, null, XPathResult.ANY_TYPE, null);
-                            var nameElement = nameElements.iterateNext();
-                            var name = nameElement.textContent;
-                            var link = nameElement.getAttribute("href");
-                            var ageElements = document.evaluate("./following-sibling::b", nameElement, null, XPathResult.ANY_TYPE, null);
-                            var ageElement = ageElements.iterateNext();
-                            var age = "";
-                            if (ageElement != null)
-                                age = ageElement.textContent;
-                            var address = saInfoElement.getElementsByTagName("address")[0].textContent;
-                            var addressTokens = /Россия, (.+)/.exec(address);
-                            if (addressTokens && addressTokens.length >= 2) {
-                                address = addressTokens[1];
-                            }
-                            addressTokens = /Москва, (м\.\s*.+)/.exec(address);
-                            if (addressTokens && addressTokens.length >= 2) {
-                                address = addressTokens[1];
-                            }
-                            var lookingForElements = saInfoElement.getElementsByClassName("s-param");
-                            var lookingFor = "";
-                            if (lookingForElements.length > 0) {
-                                lookingFor = lookingForElements[0].textContent;
-                                // not sure why it's not working
-                                //lookingFor.replace("Ищу ", "");
-                                if (lookingFor.substring(0, 4) == "Ищу ") {
-                                    lookingFor = lookingFor.substring(4, lookingFor.length);
-                                }
-                            }
-                            // <li class="U-Normal UT-Normal ">
-                            var profileRoot = saInfoElement.parentNode.parentNode;
-                            var photoCountElements = profileRoot.getElementsByClassName("vp-count");
-                            var photoCount = "";
-                            if (photoCountElements.length > 0) {
-                                photoCount = photoCountElements[0].textContent;
-                            }
-                            // 
-                            var ribbon = GetRibbon();
-                            var ribbonItem = document.createElement("table");
-                            ribbonItem.style = 'display: inline-block; width: auto; margin-right: 3px';
-                            //console.log("<tr><td>" + "<a href='" + link + "'>" + imgs[0].outerHTML + "</a></td></tr><tr><td><font color=\"green\" size=\"3\"><b>" + index + "</b></font> " + "<a href='" + link + "'>" + name + "</a>" + ", <b>" + age + "</b><br>" + address + "<br>" + lookingFor + "<div style='color: #F60'>" + photoCount + "</div>" + "</td></tr>");
-                            ribbonItem.innerHTML = "<tr><td>" + imgs[0].outerHTML + "</td></tr><tr><td><font color=\"green\" size=\"3\"><b>" + index
-                                + "</b></font> <span style=\"color: #06C\">" + name + "</span>, <b>" + age + "</b><br>" + address + "<br>" + lookingFor + "<table><tr><td style='color: #F60'>" + photoCount + "</td><td style=\"padding-right: 5px\" align=\"right\">" + heightWeight + "</td></tr></table></td></tr>";
-                            ribbon.appendChild(ribbonItem);
-                        }*/
-                    }
-                    if (photolinksFound) {
-                        var picRefPhotoNodes = divPicNode.getElementsByTagName("a");
-                        //console.log("picRefPhotoNodes " + picRefPhotoNodes[0].href);
-                        //console.log(" -> " + photoLinkTokens[1]);
-                        if (picRefPhotoNodes.length >= 1) {
-                            picRefPhotoNodes[0].href = photoLinkTokens[1];
-                        }
-                    }
-                }
-            }
-        } else {
-            //alert('There was a problem with the request. ' + httpRequest.status + httpRequest.responseText);
-        }
-    }
-}
-
-function GetRibbon() {
-    var ribbon = document.getElementById("ProfileRibbon");
-    if (ribbon == null) {
-        var divs = document.getElementsByTagName("div");
-        for (div in divs) {
-            var ribbonDiv = divs[div];
-            if (ribbonDiv.className == "MainBlockRightSearch") {
-                var ribbon = document.createElement("div");
-                ribbon.id = "ProfileRibbon";
-                ribbonDiv.insertBefore(ribbon, ribbonDiv.firstChild);
-                break;
-            }
-        }
-    }
-    return ribbon;
-}
+addJQuery(onLoad);
